@@ -35,6 +35,7 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <netdb.h>
@@ -2065,11 +2066,30 @@ void check_special_connections_overflow (void) {
   }
 }
 
+static time_t config_last_mtime;
+
+static void check_config_file_changed (void) {
+  struct stat st;
+  if (stat (config_filename, &st) < 0) {
+    return;
+  }
+  if (config_last_mtime == 0) {
+    config_last_mtime = st.st_mtime;
+    return;
+  }
+  if (st.st_mtime != config_last_mtime) {
+    config_last_mtime = st.st_mtime;
+    kprintf ("config file %s changed, reloading\n", config_filename);
+    do_reload_config (0x17);
+  }
+}
+
 void cron (void) {
   check_children_status ();
   compute_stats_sum ();
   check_special_connections_overflow ();
   check_all_conn_buffers ();
+  check_config_file_changed ();
 }
 
 int sfd;
